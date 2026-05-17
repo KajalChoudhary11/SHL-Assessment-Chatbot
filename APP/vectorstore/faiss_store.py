@@ -1,52 +1,45 @@
 import pickle
-import faiss
-import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
-from sentence_transformers import SentenceTransformer
+with open("DATA/documents.pkl", "rb") as f:
+    documents = pickle.load(f)
 
-
-model = SentenceTransformer('all-MiniLM-L6-v2')
-
-
-index = faiss.read_index('DATA/faiss_index.bin')
-
-with open('DATA/metadata.pkl', 'rb') as f:
+with open("DATA/metadata.pkl", "rb") as f:
     metadata = pickle.load(f)
 
 
+vectorizer = TfidfVectorizer()
+
+document_vectors = vectorizer.fit_transform(documents)
+
 def search(query, top_k=5):
 
-    # Create query embedding
-    query_embedding = model.encode([query])
+    query_vector = vectorizer.transform([query])
 
-    query_embedding = np.array(query_embedding).astype('float32')
+    similarities = cosine_similarity(
+        query_vector,
+        document_vectors
+    ).flatten()
 
-    # Search FAISS
-    distances, indices = index.search(query_embedding, top_k)
+    top_indices = similarities.argsort()[-top_k:][::-1]
 
     results = []
 
-    for idx in indices[0]:
+    for idx in top_indices:
 
-        if idx < len(metadata):
-
-            results.append(metadata[idx])
+        results.append(metadata[idx])
 
     return results
 
 
 if __name__ == "__main__":
 
-    results = search(
-        "Java backend developer assessment",
-        top_k=5
-    )
+    results = search("Java backend developer")
 
     for r in results:
 
-        print("Assessment Name:", r["name"])
-        print("URL:", r["link"])
-        print("Duration:", r["duration"])
-        print("Job Levels:", r["job_levels"])
+        print(r["name"])
+        print(r["link"])
 
         print("-" * 50)
